@@ -1,6 +1,6 @@
-const mongoose = require('mongoose')
+const mongoose = require('mongoose')// banco de dados
 const validator = require('validator'); //para validar email
-const bcryptjs = require('bcryptjs');
+const bcryptjs = require('bcryptjs');//para proteçao de senha
 
 // pequena validaçao para dizer que quer esses dados e qual tipo
 const LoginSchema = new mongoose.Schema({
@@ -13,25 +13,51 @@ const LoginModel = mongoose.model('Login', LoginSchema);
 
 class Login {
     constructor(body) {
-        this.body = body;
+        this.body = body;//formulario
         this.errors = [];
         this.user = null;
     }
+    // LOGIN COM INFO DO BD
 
-    async register() {
+    async login(){
         this.valida();
         if (this.errors.length > 0) return;
         
-        try {
-            //fazendo um hash da senha, nao precisa decorar
-            const salt = bcryptjs.genSaltSync();
-            this.body.password = bcryptjs.hashSync(this.body.password, salt);
-            //manda para o BD os dados do form
-            this.user = await LoginModel.create(this.body); 
-        } catch (e) {
-            console.log(e)
+        //verificando se usuario existe no BD
+        this.user = await LoginModel.findOne({ email: this.body.email});
+        if(!this.user) {
+            this.errors.push('Usuario não existe!')
+            return; 
         }
+        
+        //verificar a senha do usuario
+        //aqui esta comparando a senha do form com a do BD
+        if(!bcryptjs.compareSync(this.body.password, this.user.password)){
+            this.errors.push('Senha Invalida!');
+            this.user = null;
+            return;
+        }
+    }
 
+    // REGISTRO NO BD
+    async register() {
+        this.valida();
+        if (this.errors.length > 0) return;
+
+        await this.UserExists();
+
+        if (this.errors.length > 0) return;
+
+        //fazendo um hash da senha, nao precisa decorar
+        const salt = bcryptjs.genSaltSync();
+        this.body.password = bcryptjs.hashSync(this.body.password, salt); 
+        //manda para o BD os dados do form
+        this.user = await LoginModel.create(this.body); 
+    }
+
+    async UserExists(){
+        this.user = await LoginModel.findOne({ email: this.body.email});
+        if(this.user) this.errors.push('Usuario ja existe')
     }
 
     valida() {
